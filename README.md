@@ -2,7 +2,7 @@
 The methods related to type identification for Mycoplasma pneumoniae.
 # Quick Start (with examples)
 ~~~~~~~~~~~~~~
-python Sitewise_comparision.py -r examples/GCA_900660465.1_50648_A01-3_genomic.fna -s examples/MP_P1.sites -q examples/HD0021418-B2.result.fastq -b examples/HD0021418-B2/etoki.mapping.merged.bam
+python Sitewise_comparision.py -r examples/GCA_900660465.1_50648_A01-3_genomic.fna -s examples/MP_P1.sites -q examples/HD0021418-B2.result.fastq -b examples/etoki.mapping.merged.bam
 ~~~~~~~~~~~~~~
 # USAGE
 ~~~~~~~~~~~~~~
