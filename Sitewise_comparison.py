@@ -41,22 +41,23 @@ def rc(seq, missingValue='N') :
 
 
 @click.command()
-@click.option('-r', '--ref', help='reference genome in fasta format', required=True)
-@click.option('-s', '--site', help='type-specific SNPs in format of <seq_name> <site> <SNP>', required=True)
-@click.option('-q', '--qry', help='query MAG in fastq format', required=True)
-@click.option('-b', '--bam', help='bam file specifying mapping results', required=True)
-@click.option('--minimap2', help='default: /users/softwares/bin/minimap2', default='/users/softwares/bin/minimap2')
-@click.option('--samtools', help='default: /users/softwares/bin/samtools', default='/users/softwares/bin/samtools')
-def get_site_info(ref, site, qry, bam, minimap2, samtools) :
+@click.option('-r', '--ref', help='reference sequence', required=True)
+@click.option('-s', '--site', help='sites of concern, in format of <seq_name> <site>', required=True)
+@click.option('-q', '--qry', help='query sequence', required=True)
+@click.option('-b', '--bam', help='bam file specifying mapping results', default=None)
+@click.option('-o', '--out', help='output file', default=None)
+@click.option('--minimap2', help='default: /titan/softwares/bin/minimap2', default='/titan/softwares/bin/minimap2')
+@click.option('--samtools', help='default: /titan/softwares/bin/samtools', default='/titan/softwares/bin/samtools')
+def get_site_info(ref, site, qry, bam, out, minimap2, samtools) :
     sites = {}
     with open(site, 'rt') as fin :
         for line in fin :
             p = line.strip().split()
             if p[0] not in sites :
                 sites[p[0]] = []
-            if len(p[2]) > 4 or p[2][0] == '.' or p[2][-1] == '.' :
+            if p[2][0] in ('.', '+', '-') or p[2][-1] == '.' :
                 continue
-            sites[p[0]].append([int(p[1]), [p[2][0], p[2][-1]], []])
+            sites[p[0]].append([int(p[1]), [p[2].split('-')[0], p[2].split('>')[-1]], []])
 
     qry_seq, _ = readFastq(qry)
     ref_seq, _ = readFastq(ref)
@@ -84,7 +85,7 @@ def get_site_info(ref, site, qry, bam, minimap2, samtools) :
         xi = 0
         while xi < len(sites[p[5]]) and sites[p[5]][xi][0] < ri :
             xi += 1
-        for s, t in re.findall('(\d+)([MDI])', cigar) :
+        for s, t in re.findall(r'(\d+)([MDI])', cigar) :
             s = int(s)
             if t != 'I' :
                 rj = ri + s
@@ -121,29 +122,29 @@ def get_site_info(ref, site, qry, bam, minimap2, samtools) :
 
         for line in p.stdout :
             p = line.strip().split('\t')
-            bases = re.sub('\^.', '', p[4].upper()).replace('$', '')
-            bases = ''.join([b[int(n):] for n, b in re.findall('[+-](\d+)([A-Z]+)', '+0' + bases)])
+            bases = re.sub(r'\^.', '', p[4].upper()).replace('$', '')
+            bases = ''.join([b[int(n):] for n, b in re.findall(r'[+-](\d+)([A-Z]+)', '+0' + bases)])
             bases = dict(zip(*np.unique(list(bases), return_counts=True)))
             base_comp[(p[0], int(p[1]))] = {b:int(bases.get(b, 0)) for b in ('A', 'C', 'G', 'T')}
 
-    print('#Ref_seq\tRef_site\tAnc_base\tAnc_depth\tAlt_seq\tAlt_depth\tDetails')
-    for cont, site_info in sites.items() :
-        for site, bb, variants in site_info :
-            # print(site, bb, variants)
-            if variants :
-                v = variants[0]
-                key = (v[0], v[1])
-                if key not in base_comp :
-                    key = (v[0].split('_', 1)[-1], v[1])
-                if key not in base_comp :
-                    key = (cont, v[1])
+    with open(out, 'wt') as fout :
+        fout.write('#Ref_seq\tRef_site\tAnc_base\tAnc_depth\tAlt_seq\tAlt_depth\tDetails\n')
+        for cont, site_info in sites.items() :
+            for site, bb, variants in site_info :
+                # print(site, bb, variants)
+                if variants :
+                    v = variants[0]
+                    key = (v[0], v[1])
+                    if key not in base_comp :
+                        key = (v[0].split('_', 1)[-1], v[1])
+                    if key not in base_comp :
+                        key = (cont, v[1])
 
-                bases = base_comp.get(key, {'A':0,'C':0,'G':0,'T':0})
-            else :
-                bases = {'A':0,'C':0,'G':0,'T':0}
-            print('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}'.format(cont, site, bb[0], bases[bb[0]], bb[1], bases[bb[1]], json.dumps(bases, sort_keys=True)))
+                    bases = base_comp.get(key, {'A':0,'C':0,'G':0,'T':0})
+                else :
+                    bases = {'A':0,'C':0,'G':0,'T':0}
+                fout.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(cont, site, bb[0], np.sum([bases[x] for x in bb[0].split(',')]), bb[1], np.sum([bases[x] for x in bb[1].split(',')]), json.dumps(bases, sort_keys=True)))
 
 
 if __name__ == '__main__' :
     get_site_info()
-
